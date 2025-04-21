@@ -1,0 +1,7 @@
+{
+    "input_path": "config\\environments",
+    "input_name": "input_mid_poisson.yaml",
+    "visual_postfix": "_tmp",
+    "experiments_path": "Experiments",
+    "experiments_name": "experiments_new_simple.json"
+}
