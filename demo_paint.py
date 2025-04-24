@@ -23,8 +23,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-sim_steps', type=int, default=100, help='simulation steps')
     parser.add_argument('--animate', action='store_true', help='使用动画可视化')
-    parser.add_argument('--save', action='store_true', help='保存动画')
+    parser.add_argument('--save', help='保存动画到指定文件路径', default=None)
     parser.add_argument('--interval', type=int, default=500, help='动画帧间隔(毫秒)')
+    parser.add_argument('--render', action='store_true', default=False, help='在仿真过程中实时显示动画')
+
     args = parser.parse_args()
 
     with open(os.path.join(RoothPath.get_root(), 'config', 'config.json'), 'r') as json_file:
@@ -41,7 +43,7 @@ if __name__ == '__main__':
 
     dimensions = param['map']['dimensions']
     obstacles = param['map']['obstacles']
-    non_task_endpoints = param['map']['non_task_endpoints'] # 可能不需要
+
     base_points = param['map']['base_points']
 
     agents = param['agents']
@@ -78,19 +80,17 @@ if __name__ == '__main__':
         
         # 启动动画仿真
         painter.start_animation(
-            sim_steps=args.sim_steps,
-            local_map=l_map,
-            agents=workers,
-            realmap=REAL_MAP,
-            simulation=simulation,
-            task_planner=task_planner,
-            path_planner=path_planner,
-            interval=args.interval
+        sim_steps=args.sim_steps,
+        local_map=l_map,
+        agents=workers,
+        realmap=REAL_MAP,
+        simulation=simulation,
+        task_planner=task_planner,
+        path_planner=path_planner,
+        interval=args.interval,
+        save_path=args.save,  # 现在直接传递保存路径
+        render=args.render  # 是否实时显示动画
         )
-        
-        # 如果需要保存动画
-        if args.save:
-            painter.save_animation("simulation.mp4")
     else:
         # 传统仿真模式
         ##-----------------

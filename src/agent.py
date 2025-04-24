@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 from .utils import *
 
-LASER_RANGE = 3
-COMM_RANGE = 3
+LASER_RANGE = 2
+COMM_RANGE = 2
 
 class Agent():
     """
@@ -159,17 +159,24 @@ class Agent():
         self.drop()
 
     def scan_frontier(self):
-        if self.schedule and self.schedule[0]['name'] == 'frontier':
-            if self.schedule[0]['pos'] not in self.map.centroids.keys() or self.pos == self.schedule[0]['pos']: # 如果消失了就重新分配
-                self.schedule.pop(0)
+        
+        for s in self.schedule.copy():
+            if s['name'] == 'frontier':
+                if s['pos'] not in self.map.centroids.keys() or self.pos == s['pos']:
+                    self.schedule.remove(s)
+
+        # if self.schedule and self.schedule[0]['name'] == 'frontier':
+        #     if self.schedule[0]['pos'] not in self.map.centroids.keys() or self.pos == self.schedule[0]['pos']: # 如果消失了就重新分配
+        #         self.schedule.pop(0)
 
 
     def pick(self):
         """模拟抓取任务的行为"""
         waypoints  = [s['pos'] for s in self.schedule]
         if self.pos in waypoints:
+            # 下面是完整独立的逻辑
             for s in self.schedule:
-                if self.is_task(s):
+                if self.is_task(s) and s['pos'] == self.pos:
                     task_name = s['name']
                     self.picked_tasks.append(task_name)
                     self.schedule.remove(s)
@@ -179,12 +186,17 @@ class Agent():
         x, y = self.pos
         if self.map.map[y][x] == 2:
             # base点
-            self.map.u_tasks.difference_update(self.picked_tasks)
+            #self.map.u_tasks.difference_update(self.picked_tasks)
             self.map.c_tasks.update(self.picked_tasks)
             self.print(f"drop tasks: {self.picked_tasks}")
-            self.assigned_tasks = []
-            self.picked_tasks = []
-            self.schedule = []
+            self.assigned_tasks = [a_task for a_task in self.assigned_tasks if a_task not in self.picked_tasks]
+            self.picked_tasks = [] # 清空手上的任务
+            if len(self.schedule) == 1 and self.schedule[0]['name'] == 'base' and self.schedule[0]['pos'] == self.pos:
+                self.schedule.remove({'name': 'base', 'pos': self.pos}) # 清空base点的schedule
+            #todo 有可能会没有拾取任务，或者只拾取了部分也回base
+            # self.assigned_tasks = []
+            # self.picked_tasks = []
+            # self.schedule = []
 
             
 
