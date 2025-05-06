@@ -12,6 +12,14 @@ import numpy as np
 from sklearn.cluster import MeanShift, estimate_bandwidth
 import math
 from matplotlib import pyplot as plt
+from itertools import chain
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .agent import Agent
+    from .Token import Token
+
 
 class Map:
     """
@@ -38,11 +46,7 @@ class Map:
         self.task_map = self.__gen_task_map(tasks) # 可以先让任务的起点不一样
         # 存储任务信息，后续必须和task_map保持一致
         self.tasks_seen = self.get_tasks_seen()
-        self.u_tasks = set() # 未完成的任务名字列表
-        self.c_tasks = set() # 已完成的任务名字列表
-         # 任务全局信息
-        self._tasks = tasks
-        self._tasks_dict = {t['task_name']: t for t in tasks}
+
         
         # 初始化已知区域计算
         self.update_known_area()
@@ -102,7 +106,7 @@ class Map:
     ##==================================================
     # 地图更新函数
     ##==================================================
-    def update(self, realmap: "Map", senses):
+    def update(self, realmap: "Map", senses, token: "Token"):
         """
         根据机器人的感知信息更新地图
         ----------
@@ -121,7 +125,7 @@ class Map:
             if realmap.task_map[y][x] is not None:
                 if self.task_map[y][x] is None or self.task_map[y][x] != realmap.task_map[y][x]:
                     self.task_map[y][x] = realmap.task_map[y][x]
-                    self.u_tasks.add(realmap.task_map[y][x]['task_name']) #更新u_tasks
+                    token.unassigned_tasks.add(realmap.task_map[y][x]['task_name']) #更新unassigned_tasks
         
         self.get_tasks_seen()
         # 更新已知区域
@@ -159,7 +163,7 @@ class Map:
                         self.frontiers.append((x,y))
         return self.frontiers
 
-    def gen_centroids(self, method='mean_shift', bandwidth=4):
+    def gen_centroids(self, method='mean_shift', bandwidth=3):
         """
         对前沿点进行聚类获取中心点，并计算各种权重
         """
@@ -182,7 +186,7 @@ class Map:
             return None
         return self.centroids
 
-    def __mean_shift(self, frontiers, bandwidth=4):
+    def __mean_shift(self, frontiers, bandwidth=3):
         """
         使用均值漂移(Mean Shift)方法聚类前沿点
         """
@@ -250,12 +254,55 @@ class Map:
         map_unknown = copy.deepcopy(self)
         # 将整个地图标记为未知
         map_unknown.map = np.full((self.height, self.width), -1, dtype=np.int32)
+        for (x,y) in self.base_points:
+            map_unknown.map[y][x] = 2 # 基地点已知
         # 将任务地图也标记为未知
         map_unknown.task_map = [[None for _ in range(self.width)] for _ in range(self.height)]
         map_unknown.tasks_seen = []
         return map_unknown
 
 
+
+    @classmethod
+    def merge_maps(cls, maps_list: list["Map"]):
+        """
+        合并多个Map实例的信息, 会通过deepcopy给各个agent创建新的地图实例
+        Parameters:
+            maps_list: (list of Map), 要合并的Map实例列表
+            comm_graph: 可以通信的一系列agents
+        Returns:
+            merged_map: (Map), 合并后的新Map实例
+        """
+        # 以第一个地图为基础
+        base_map = maps_list[0]
+        
+
+        merged_map = copy.deepcopy(base_map)  # 创建一个新的地图实例
+        
+        # 合并所有地图的已知区域
+        for idx, current_map in enumerate(maps_list):
+            for y in range(merged_map.height):
+                for x in range(merged_map.width):
+                    # 如果当前地图的该点是已知的，则合并到新地图
+                    if current_map.map[y][x] != -1:
+                        merged_map.map[y][x] = current_map.map[y][x]
+                    
+                    # 合并任务信息，后续可以据此更新tasks_seen
+                    if current_map.task_map[y][x] is not None:
+                        merged_map.task_map[y][x] = current_map.task_map[y][x]
+        
+
+        # 更新已知区域数量
+        merged_map.update_known_area()
+        
+        # 重新计算前沿点和中心点
+        merged_map.get_frontiers()
+        merged_map.gen_centroids()
+        
+        # 更新任务信息
+        merged_map.get_tasks_seen()
+        
+        return merged_map
 
     @staticmethod
     def color_the_map(map_grid):

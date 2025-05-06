@@ -6,6 +6,7 @@ import random
 if TYPE_CHECKING:
     from .agent import Agent
     from .map import Map
+    from .Token import Token
 
 DEBUG = False
 
@@ -19,9 +20,10 @@ class Path_Planner:
             'edges': defaultdict(set)     # key: time, value: set of (x1, y1, x2, y2)
         }
     
-    def plan_paths(self, workers: list["Agent"], map_obj: "Map"):
+    def plan_paths(self, workers: list["Agent"], map_obj: "Map", b_token: "Token"):
         """
         为所有工作者规划无碰撞路径
+        更新worker的属性, 同时更新b_token的属性
         :param workers: 工作者列表
         :param map_obj: 地图对象
         :return: dict {agent_name: full_path}，其中 full_path 为一系列 (x,y) 坐标的列表
@@ -40,7 +42,7 @@ class Path_Planner:
         for y in range(map_obj.height):
             for x in range(map_obj.width):
                 # 1表示障碍物，-1表示未知区域，都视为障碍
-                if map_obj.map[y][x] == 1 or map_obj.map[y][x] == -1:
+                if map_obj.map[y][x] == 1: # 先不把未知区域当成障碍物
                     obstacles.add((x, y))
         
         planned_paths = {}
@@ -59,6 +61,7 @@ class Path_Planner:
                 planned_paths[worker.name] = waypoints
                 self.reserve_path(waypoints)
                 worker.planned_path = waypoints
+                b_token.agents_to_paths[worker.name] = waypoints
                 continue
                 
             full_path = []
@@ -87,7 +90,8 @@ class Path_Planner:
                 current = segment[-1]
                 
             planned_paths[worker.name] = full_path
-            worker.planned_path = full_path
+            worker.planned_path = full_path # 对于worker的路径进行更新
+            b_token.agents_to_paths[worker.name] = full_path # 更新b_token的路径,每次都完全生成新的，所以不需要copy来创建不同的对象
             # 预定该 agent 的路径，防止后续 agent 产生冲突
             self.reserve_path(full_path)
             
